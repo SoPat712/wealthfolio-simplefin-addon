@@ -876,9 +876,29 @@ export const PENDING_SUFFIX = ' · pending';
  * prefix and the metadata marker so the pair validates on every path.
  */
 export const TRANSFER_GROUP_PREFIX = 'wf-transfer-';
+/**
+ * Return an RFC 4122 v4 UUID in hosts that expose Web Crypto without the
+ * optional `randomUUID` convenience method. Wealthfolio's addon sandbox is one
+ * such host: `getRandomValues` is available, but calling `randomUUID` throws.
+ */
+export function randomUuid(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+
+  if (typeof globalThis.crypto?.getRandomValues !== 'function') {
+    throw new Error('Secure random number generation is unavailable');
+  }
+
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0'));
+  return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10).join('')}`;
+}
 /** Mint a group id a host can stamp on both legs of a pair. The prefix is itself
  *  one of the internal-transfer markers, so it does double duty. */
-export const newTransferGroupId = () => `${TRANSFER_GROUP_PREFIX}${crypto.randomUUID()}`;
+export const newTransferGroupId = () => `${TRANSFER_GROUP_PREFIX}${randomUuid()}`;
 /** Serialized, NOT an object: the server's `metadata` is `Option<String>` (a JSON
  *  blob), so an object 422s. Mirrors what Wealthfolio itself stores —
  *  `json!({ "flow": { "is_external": … } }).to_string()`. */
